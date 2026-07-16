@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Platform template (vk-ads, unity-ads, mintegral)
+model Platform {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  accounts Account[]
+
+  @@map("platforms")
+}
+
+/// Concrete advertising account (multiple per platform)
+model Account {
+  id         String   @id @default(cuid())
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id])
+
+  name    String  // User-friendly label, e.g. "VK Ads — Основной"
+  enabled Boolean @default(true)
+
+  credentials Json
+  accessToken String?
+  tokenExpiry DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  snapshots BalanceSnapshot[]
+  campaigns Campaign[]
+  alerts    Alert[]
+
+  @@map("accounts")
+}
+
+model BalanceSnapshot {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  balance       Float
+  currency      String @default("RUB")
+  dailySpend    Float?
+  daysRemaining Float?
+
+  totalDeposits Float?
+  totalCharges  Float?
+
+  fetchedAt DateTime @default(now())
+
+  @@index([accountId, fetchedAt])
+  @@map("balance_snapshots")
+}
+
+model Campaign {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  externalId String
+  name       String
+  appName    String?
+  isActive   Boolean @default(true)
+
+  spendRecords CampaignSpend[]
+
+  @@unique([accountId, externalId])
+  @@map("campaigns")
+}
+
+model CampaignSpend {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  date  DateTime @db.Date
+  spend Float
+
+  @@unique([campaignId, date])
+  @@index([campaignId, date])
+  @@map("campaign_spends")
+}
+
+model Alert {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  level         String
+  daysRemaining Float
+  balance       Float
+  dailySpend    Float
+  message       String
+  slackSent     Boolean  @default(false)
+  slackError    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@map("alerts")
+}
+
+model Settings {
+  id String @id @default("default")
+
+  criticalThreshold Int @default(1)
+  warningThreshold  Int @default(2)
+  cautionThreshold  Int @default(5)
+
+  slackWebhookUrl String?
+
+  fetchIntervalMin Int @default(10)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

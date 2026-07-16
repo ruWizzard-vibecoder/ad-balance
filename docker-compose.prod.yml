@@ -1,0 +1,51 @@
+services:
+  ad-balance:
+    build:
+      context: .
+      network: host
+    container_name: ad-balance
+    restart: unless-stopped
+    ports:
+      - "3030:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://adbalance:changeme@adbalance-postgres:5432/ad_balance
+    env_file:
+      - .env.production
+    depends_on:
+      adbalance-postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - claude-code-nas_claude-network
+
+  adbalance-postgres:
+    image: postgres:18-alpine
+    container_name: adbalance-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5435:5432"
+    environment:
+      POSTGRES_USER: adbalance
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: ad_balance
+    volumes:
+      - adbalance-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adbalance -d ad_balance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  adbalance-pgdata:
+
+networks:
+  claude-code-nas_claude-network:
+    external: true
